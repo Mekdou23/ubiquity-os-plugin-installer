@@ -4,7 +4,7 @@ const md = new MarkdownIt();
 
 const CONFIG_INPUT_STR = "config-input";
 
-export const manifestGuiBody = document.getElementById("manifest-gui-body");
+export const manifestGuiBody = typeof document !== "undefined" ? document.getElementById("manifest-gui-body") : null;
 
 export function createElement<TK extends keyof HTMLElementTagNameMap>(
   tagName: TK,

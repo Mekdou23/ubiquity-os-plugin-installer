@@ -2,6 +2,7 @@ import { Plugin } from "../../types/plugins";
 import { createElement } from "../../utils/element-helpers";
 import { getManifestCache } from "../../utils/storage";
 import { STRINGS } from "../../utils/strings";
+import { getPremadePluginSettings } from "../predefined-configs/template-handler";
 import { ManifestRenderer } from "../render-manifest";
 import { renderConfigEditor } from "./config-editor";
 import { controlButtons } from "./control-buttons";
@@ -83,7 +84,8 @@ export function renderPluginSelector(renderer: ManifestRenderer): void {
         selectSelected.textContent = optionText;
         closeAllSelect();
         localStorage.setItem("selectedPluginManifest", JSON.stringify(defaultForInstalled));
-        renderConfigEditor(renderer, defaultForInstalled.manifest, installedPlugin?.uses[0].with);
+        const expandedConfig = installedPlugin?.uses[0].with ?? getPremadePluginSettings(pluginName);
+        renderConfigEditor(renderer, defaultForInstalled.manifest, expandedConfig);
       });
     }
 

@@ -168,11 +168,16 @@ export class ConfigParser {
     const parsedConfig = this.parseConfig(this.repoConfig);
     parsedConfig.plugins ??= [];
 
+    const withSettings = plugin.uses[0].with;
+    const hasWithSettings = Boolean(withSettings && Object.keys(withSettings).length > 0);
+    const normalizedUse = hasWithSettings ? { plugin: plugin.uses[0].plugin, with: withSettings } : { plugin: plugin.uses[0].plugin };
+    const normalizedPlugin: Plugin = { ...plugin, uses: [normalizedUse] };
+
     const existingPlugin = parsedConfig.plugins.find((p) => p.uses[0].plugin === plugin.uses[0].plugin);
     if (existingPlugin) {
-      existingPlugin.uses[0].with = plugin.uses[0].with;
+      existingPlugin.uses[0] = normalizedUse;
     } else {
-      parsedConfig.plugins.push(plugin);
+      parsedConfig.plugins.push(normalizedPlugin);
     }
 
     this.newConfigYml = YAML.stringify(parsedConfig);

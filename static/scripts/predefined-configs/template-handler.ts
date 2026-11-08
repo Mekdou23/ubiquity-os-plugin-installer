@@ -6,7 +6,7 @@ import { ManifestRenderer } from "../render-manifest";
 import { controlButtons } from "../rendering/control-buttons";
 import { parseConfigInputs } from "../rendering/input-parsing";
 import { addTrackedEventListener, updateGuiTitle } from "../rendering/utils";
-import { Manifest, ManifestPreDecode, Plugin, PluginConfig } from "../../types/plugins";
+import { Manifest, ManifestPreDecode, Plugin, PluginConfig, PremadeConfigTemplate, PremadeMetadata } from "../../types/plugins";
 import { createConfigParamTooltip, createElement, createInputRow } from "../../utils/element-helpers";
 import { getManifestCache } from "../../utils/storage";
 import { STRINGS } from "../../utils/strings";
@@ -14,6 +14,73 @@ import { toastNotification } from "../../utils/toaster";
 
 type TemplateTypes = "minimal" | "full-defaults" | "custom";
 declare const MINIMAL_PREDEFINED_CONFIG: string;
+
+const DEFAULT_PREMADE_METADATA: PremadeMetadata = {
+  name: "UbiquityOS Standard Config",
+  description: "The fully-enabled and battle-tested configuration which we use across all organizations at Ubiquity.",
+  version: "1.0",
+};
+
+export function parsePremadeTemplate(rawConfig?: string): PremadeConfigTemplate {
+  const source = rawConfig ?? (typeof MINIMAL_PREDEFINED_CONFIG !== "undefined" ? MINIMAL_PREDEFINED_CONFIG : "");
+  const trimmed = source.trim();
+  if (!trimmed) {
+    return { metadata: { ...DEFAULT_PREMADE_METADATA }, plugins: [] };
+  }
+  if (trimmed.startsWith("{")) {
+    const obj = JSON.parse(trimmed) as Record<string, unknown>;
+    if ("metadata" in obj && "plugins" in obj && Array.isArray(obj.plugins)) {
+      const meta = obj.metadata as Partial<PremadeMetadata>;
+      return {
+        metadata: {
+          name: meta.name || DEFAULT_PREMADE_METADATA.name,
+          description: meta.description || DEFAULT_PREMADE_METADATA.description,
+          version: meta.version || DEFAULT_PREMADE_METADATA.version,
+        },
+        plugins: obj.plugins as Plugin[],
+      };
+    }
+    const parts = Object.entries(obj).map(([, value]) => {
+      return `\n  ${typeof value === "object" && value && "yamlConfig" in value && value.yamlConfig ? String(value.yamlConfig) : ""}`;
+    });
+    const parsedPlugins = YAML.parse(`plugins:${parts.join("")}`) as PluginConfig | null;
+    return {
+      metadata: { ...DEFAULT_PREMADE_METADATA },
+      plugins: parsedPlugins?.plugins || [],
+    };
+  }
+  const parsedYaml = YAML.parse(trimmed) as Partial<PremadeConfigTemplate> | null;
+  const meta = parsedYaml?.metadata;
+  return {
+    metadata: {
+      name: meta?.name || DEFAULT_PREMADE_METADATA.name,
+      description: meta?.description || DEFAULT_PREMADE_METADATA.description,
+      version: meta?.version || DEFAULT_PREMADE_METADATA.version,
+    },
+    plugins: Array.isArray(parsedYaml?.plugins) ? parsedYaml.plugins : [],
+  };
+}
+
+export function renderPremadeConfigYaml(rawConfig?: string): string {
+  const template = parsePremadeTemplate(rawConfig);
+  return YAML.stringify({ plugins: template.plugins });
+}
+
+export function getPremadePluginSettings(pluginIdentifier: string, rawConfig?: string): Record<string, unknown> | undefined {
+  const normalizedTarget = pluginIdentifier.trim().toLowerCase();
+  if (!normalizedTarget) {
+    return undefined;
+  }
+  try {
+    const template = parsePremadeTemplate(rawConfig);
+    const matched = template.plugins.find((entry) =>
+      entry.uses?.some((useItem) => useItem.plugin.toLowerCase().includes(normalizedTarget))
+    );
+    return matched?.uses?.[0]?.with;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function configTemplateHandler(type: TemplateTypes, renderer: ManifestRenderer) {
   const org = localStorage.getItem("selectedOrg");
@@ -73,12 +140,7 @@ async function writeTemplate(renderer: ManifestRenderer, config: string, type: T
 
 async function handleMinimalTemplate(): Promise<string> {
   try {
-    const obj = JSON.parse(MINIMAL_PREDEFINED_CONFIG);
-    const parts = Array.from(Object.entries(obj)).map(([, value]) => {
-      return `\n  ${typeof value === "object" && value && "yamlConfig" in value && value.yamlConfig ? value.yamlConfig : ""}`;
-    });
-
-    return `plugins:${parts.join("")}`;
+    return renderPremadeConfigYaml(MINIMAL_PREDEFINED_CONFIG);
   } catch (error) {
     toastNotification("Failed to fetch minimal predefined config", { type: "error" });
     throw error;
