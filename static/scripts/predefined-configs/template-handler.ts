@@ -40,6 +40,12 @@ export function parsePremadeTemplate(rawConfig?: string): PremadeConfigTemplate 
         plugins: obj.plugins as Plugin[],
       };
     }
+    if ("plugins" in obj && Array.isArray(obj.plugins)) {
+      return {
+        metadata: { ...DEFAULT_PREMADE_METADATA },
+        plugins: obj.plugins as Plugin[],
+      };
+    }
     const parts = Object.entries(obj).map(([, value]) => {
       return `\n  ${typeof value === "object" && value && "yamlConfig" in value && value.yamlConfig ? String(value.yamlConfig) : ""}`;
     });
