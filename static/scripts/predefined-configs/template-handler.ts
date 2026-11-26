@@ -79,9 +79,15 @@ export function getPremadePluginSettings(pluginIdentifier: string, rawConfig?: s
   }
   try {
     const template = parsePremadeTemplate(rawConfig);
-    const matched = template.plugins.find((entry) =>
-      entry.uses?.some((useItem) => useItem.plugin.toLowerCase().includes(normalizedTarget))
-    );
+    const matched = template.plugins.find((entry) => {
+      const uses = entry.uses;
+      if (!uses || !Array.isArray(uses)) return false;
+      return uses.some((useItem) => {
+        if (!useItem || typeof useItem.plugin !== "string") return false;
+        const pluginName = useItem.plugin.toLowerCase();
+        return pluginName.includes(normalizedTarget);
+      });
+    });
     return matched?.uses?.[0]?.with;
   } catch {
     return undefined;
